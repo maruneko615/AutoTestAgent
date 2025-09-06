@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package sr4;
+
+// 數位輸入按鍵 (16種按鍵)
+enum EInputKeyType {
+    INPUT_KEY_UP = 0;           // 向上選擇
+    INPUT_KEY_DOWN = 1;         // 向下選擇
+    INPUT_KEY_LEFT = 2;         // 向左選擇
+    INPUT_KEY_RIGHT = 3;        // 向右選擇
+    INPUT_KEY_START = 4;        // 確認鍵
+    INPUT_KEY_NITRO = 5;        // 氮氣加速
+    INPUT_KEY_TEST = 6;         // 進入營業設定
+    INPUT_KEY_SERVICE = 7;      // 投入服務幣
+    INPUT_KEY_COIN = 8;         // 投入幣數
+    INPUT_KEY_EMERGENCY = 9;    // 安全裝置 - Motion Stop
+    INPUT_KEY_LEFT_LEG = 10;    // 安全裝置 - 左腳
+    INPUT_KEY_RIGHT_LEG = 11;   // 安全裝置 - 右腳
+    INPUT_KEY_SPEED_UP = 12;    // 加速按鈕 - Lean over
+    INPUT_KEY_LEFT_MACHINE = 13; // 左機台
+    INPUT_KEY_SEAT_DETECT = 14; // 安全裝置 - 座椅偵測
+    INPUT_KEY_MAX = 15;
+}
+
+// VR/類比輸入 (4種輸入)
+enum EInputVrType {
+    INPUT_VR_THROTTLE = 0;      // 油門催動 (0~1)
+    INPUT_VR_RIGHT_BRAKE = 1;   // 右煞車 (0~1)
+    INPUT_VR_LEFT_BRAKE = 2;    // 左煞車 (0~1)
+    INPUT_VR_STEER = 3;         // 左右轉向 (-1~1)
+    INPUT_VR_MAX = 4;
+}
+
+// 基本輸入指令訊息 (支援多鍵同時輸入)
+message InputCommand {
+    repeated EInputKeyType key_inputs = 1;  // 支援多個按鍵同時輸入
+    bool is_key_down = 2;                   // 按鍵狀態：按下(true)/放開(false)
+    int64 timestamp = 3;                    // 時間戳記
+}
+
+// VR 輸入數值
+message VrInputValue {
+    EInputVrType vr_type = 1;   // VR輸入類型
+    float value = 2;            // 輸入數值
+    int64 timestamp = 3;        // 時間戳記
+}
+
+// 複合輸入指令 (數位+類比混合)
+message ComplexInputCommand {
+    repeated InputCommand digital_inputs = 1;  // 數位輸入指令陣列
+    repeated VrInputValue analog_inputs = 2;   // 類比輸入數值陣列
+    int64 timestamp = 3;                       // 整體指令時間戳記
+}
+
+// 輸入映射訊息 (定義在特定遊戲狀態下可用的輸入)
+message InputMapping {
+    int32 applicable_state = 1;                    // 適用的遊戲狀態 (對應 EGameFlowState)
+    repeated EInputKeyType available_keys = 2;     // 可用的數位按鍵
+    repeated EInputVrType available_vr_inputs = 3; // 可用的VR輸入
+    string description = 4;                        // 描述說明
+}
+
+// 輸入配置訊息 (完整的輸入系統配置)
+message InputConfiguration {
+    repeated InputMapping state_mappings = 1;  // 各狀態的輸入映射
+    bool safety_inputs_required = 2;           // 是否需要安全輸入檢查
+    float vr_input_deadzone = 3;              // VR輸入死區設定
+    int32 input_polling_rate = 4;             // 輸入輪詢頻率 (Hz)
+}

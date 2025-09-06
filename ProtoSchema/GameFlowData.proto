@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package sr4;
+
+// 遊戲流程狀態 (41種狀態)
+enum EGameFlowState {
+    GAME_FLOW_COPYRIGHT = 0;
+    GAME_FLOW_WARNING = 1;
+    GAME_FLOW_LOGO = 2;
+    GAME_FLOW_PV = 3;
+    GAME_FLOW_COIN_PAGE = 4;
+    GAME_FLOW_SELECT_BIKE = 5;
+    GAME_FLOW_SELECT_SCENE = 6;
+    GAME_FLOW_RACE = 7;
+    GAME_FLOW_RACE_END = 8;
+    GAME_FLOW_GAME_OVER = 9;
+    GAME_FLOW_RANKING = 10;
+    GAME_FLOW_PROMOTION = 11;
+    GAME_FLOW_ACCOUNT_ENTRY = 12;
+    GAME_FLOW_PHOTO_AUTH = 13;
+    GAME_FLOW_SELECT_MODE = 14;
+    GAME_FLOW_PAY_FOR_LEVEL = 15;
+    GAME_FLOW_RIDE_SHOW = 16;
+    GAME_FLOW_LOAD_FLOW = 17;
+    GAME_FLOW_LOAD_GAME = 18;
+    GAME_FLOW_CUTSCENE = 19;
+    GAME_FLOW_MAP_BEAT_SHOW = 20;
+    GAME_FLOW_SIGN_NAME = 21;
+    GAME_FLOW_CONTINUE = 22;
+    GAME_FLOW_HARDWARE_DETECT = 23;
+    GAME_FLOW_LOAD_CONTINUE = 24;
+    GAME_FLOW_LOAD_STANDBY = 25;
+    GAME_FLOW_OPERATOR_SETTING = 26;
+    GAME_FLOW_AIRSPRING_ADJUST = 27;
+    GAME_FLOW_PLAYER_REGISTRATION = 28;
+    GAME_FLOW_WARNING_FOR_SELECTION = 29;
+    GAME_FLOW_BATTLE_MAP = 30;
+    GAME_FLOW_M23_READ = 31;
+    GAME_FLOW_RACE_FINISH_SHOW = 32;
+    GAME_FLOW_PLAYER_INFO = 33;
+    GAME_FLOW_LOCAL_BEAT_SHOW = 34;
+    GAME_FLOW_AGENT_LOGO = 35;
+    GAME_FLOW_UE_LOGO = 36;
+    GAME_FLOW_CRIWARE_LOGO = 37;
+    GAME_FLOW_STATIC_COIN_PAGE = 38;
+    GAME_FLOW_LOAD_RACE_RESULT = 39;
+    GAME_FLOW_MAX = 40;
+}
+
+// 遊戲模式
+enum EGameMode {
+    GAME_MODE_LOCAL_VERSUS = 0;
+    GAME_MODE_GLOBAL_VERSUS = 1;
+}
+
+// 賽道選擇 (10種賽道)
+enum ETrack {
+    TRACK_NONE = 0;
+    TRACK_LAS_VEGAS = 1;
+    TRACK_BEIJING = 2;
+    TRACK_SEOUL = 3;
+    TRACK_SHANGHAI = 4;
+    TRACK_THAILAND = 5;
+    TRACK_CHONGQING = 6;
+    TRACK_PHYSICS_TEST = 7;
+    TRACK_PHYSICS_TEST_2 = 8;
+    TRACK_DELIA_HUANG_TEST = 9;
+    TRACK_SHOU_WEIKU_TEST = 10;
+    TRACK_MAX = 11;
+}
+
+// 路線方向
+enum ERouteDirection {
+    ROUTE_DIRECTION_CLOCK_WISE = 0;
+    ROUTE_DIRECTION_COUNTER_CLOCK_WISE = 1;
+    ROUTE_DIRECTION_MAX = 2;
+}
+
+// 車輛類型 (8種車輛)
+enum EVehicleType {
+    VEHICLE_MSQ = 0;  // 極速王者
+    VEHICLE_MAA = 1;  // 時空行者
+    VEHICLE_MUR = 2;  // 萬能天使
+    VEHICLE_MHA = 3;  // 加速冠軍
+    VEHICLE_MRA = 4;  // 彎道女王
+    VEHICLE_MAD = 5;  // 越野達人
+    VEHICLE_MCE = 6;  // 電光喵喵
+    VEHICLE_MQB = 7;  // 未來特工
+    VEHICLE_MAX = 8;
+}
+
+// 頭像類型 (12種頭像)
+enum EPhotoType {
+    PHOTO_HELMET = 0;                // 安全帽
+    PHOTO_VEIL = 1;                  // 面紗
+    PHOTO_DIVING_GOGGLES = 2;        // 潛水眼罩
+    PHOTO_FACE_MASK = 3;             // 面罩
+    PHOTO_COMIC_MASK = 4;            // 漫畫面罩
+    PHOTO_SEA_ELF = 5;               // 海妖
+    PHOTO_KNIGHT_HELMET = 6;         // 騎士頭盔
+    PHOTO_EMOJI_MASK = 7;            // Emoji面罩
+    PHOTO_DOLL_HEADGEAR = 8;         // 動物頭套
+    PHOTO_SICHUAN_OPERA_MAKEUP = 9;  // 川劇臉譜
+    PHOTO_ORIGAMI = 10;              // 摺紙面罩
+    PHOTO_LION_DANCE = 11;           // 舞獅
+}
+
+// 車輛前進資訊
+message GameRaceData {
+    // 當前位置
+    float current_pos_x = 1;
+    float current_pos_y = 2;
+    float current_pos_z = 3;
+    
+    // 目標位置
+    float target_position_x = 4;
+    float target_position_y = 5;
+    float target_position_z = 6;
+    
+    // 法向量
+    float normal_x = 7;
+    float normal_y = 8;
+    float normal_z = 9;
+}
+
+// 完整遊戲狀態訊息
+message GameFlowData {
+    EGameFlowState current_flow_state = 1;
+    EGameMode selected_mode = 2;
+    ETrack selected_track = 3;
+    EVehicleType selected_vehicle = 4;
+    EPhotoType selected_photo = 5;
+    ERouteDirection route_direction = 6;
+    int32 player_coins = 7;
+    bool is_continue_available = 8;
+    GameRaceData race_data = 9;
+    int64 timestamp = 10;
+}
+
+// 遊戲流程控制訊息
+message GameFlowControl {
+    EGameFlowState target_state = 1;
+    map<string, string> parameters = 2;
+    int64 timestamp = 3;
+}
+
+// 遊戲流程轉換訊息
+message GameFlowTransition {
+    EGameFlowState from_state = 1;
+    EGameFlowState to_state = 2;
+    string transition_reason = 3;
+    int64 timestamp = 4;
+}
