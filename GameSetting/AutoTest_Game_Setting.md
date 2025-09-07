@@ -114,6 +114,26 @@ enum class EInputVrType: uint8
 };
 ```
 
+#### 1.2.1 按鍵屏蔽
+
+隨機輸入時屏蔽的按鍵，避免觸發不當操作：
+
+```cpp
+// 數位按鍵屏蔽 (EInputKeyType)
+BLOCKED_EInputKeyType = [
+    "Emergency",    // 緊急停止按鍵
+    "Test",         // 測試模式按鍵  
+    "LeftLeg",      // 安全裝置
+    "RightLeg",     // 安全裝置
+    "SeatDetact"    // 座椅偵測
+];
+
+// VR/類比輸入屏蔽 (EInputVrType)
+BLOCKED_EInputVrType = [
+    // 目前無屏蔽的 VR 輸入
+];
+```
+
 ---
 
 ## 🎯 SR4 流程詳細規格
@@ -297,6 +317,29 @@ enum class EVehicleType : uint8
     Mqb,
     Max
 };
+```
+
+### 3. 按鍵屏蔽設定
+
+#### 3.1 隨機輸入時屏蔽的按鍵
+以下按鍵在隨機輸入時會被排除，避免觸發不當操作：
+
+```cpp
+// 屏蔽的按鍵列表
+// 數位按鍵屏蔽 (EInputKeyType)
+BLOCKED_DIGITAL_KEYS = [
+    "Emergency",    // 緊急停止按鍵
+    "Test",         // 測試模式按鍵  
+    "Service",      // 服務按鍵
+    "LeftLeg",      // 安全裝置
+    "RightLeg",     // 安全裝置
+    "SeatDetact"    // 座椅偵測
+];
+
+// VR/類比輸入屏蔽 (EInputVrType)
+BLOCKED_VR_KEYS = [
+    // 目前無屏蔽的 VR 輸入
+];
 ```
 
 ## 🔌 數值設定

@@ -63,7 +63,7 @@ class AgentMaker:
         game_config = {
             "states": self._extract_states(content),
             "keys": self._extract_keys(content),
-            "udp_config": self._extract_udp_config(content)
+            "blocked_keys": self._extract_blocked_keys(content), "udp_config": self._extract_udp_config(content)
         }
         
         self.log(f"✅ 發現 {len(game_config['states'])} 個遊戲狀態")
@@ -206,6 +206,62 @@ class AgentMaker:
                     keys.append(key_name)
                     
         return keys
+    
+    def _extract_blocked_keys(self, content):
+        """從 GameSetting.md 提取屏蔽按鍵列表，並自動對應到實際的枚舉名稱"""
+        blocked_keys = []
+        lines = content.split('\n')
+        
+        # 先獲取實際的按鍵枚舉名稱
+        try:
+            import sys
+            sys.path.insert(0, str(self.project_root))
+            from ProtoSchema.InputCommand_pb2 import EInputKeyType
+            
+            # 建立名稱對應表 (GameSetting中的名稱 -> 實際枚舉名稱)
+            name_mapping = {}
+            for enum_value in EInputKeyType.DESCRIPTOR.values:
+                if enum_value.name.startswith('INPUT_KEY_') and enum_value.name != 'INPUT_KEY_MAX':
+                    actual_name = enum_value.name.replace('INPUT_KEY_', '')
+                    # 建立多種可能的對應
+                    name_mapping[actual_name.lower()] = actual_name  # emergency -> EMERGENCY
+                    name_mapping[actual_name] = actual_name          # EMERGENCY -> EMERGENCY
+                    
+                    # 特殊對應規則
+                    if 'LEG' in actual_name:
+                        # LEFT_LEG -> LeftLeg, RightLeg
+                        camel_case = actual_name.replace('_', '').title()
+                        name_mapping[camel_case.lower()] = actual_name
+                        name_mapping[camel_case] = actual_name
+                    elif 'DETECT' in actual_name:
+                        # SEAT_DETECT -> SeatDetact (處理拼寫差異)
+                        name_mapping['seatdetact'] = actual_name
+                        name_mapping['SeatDetact'] = actual_name
+                    
+        except ImportError:
+            self.log("⚠️ 無法導入 InputCommand_pb2，使用預設名稱對應")
+            name_mapping = {}
+        
+        for line in lines:
+            line = line.strip()
+            # 檢查各種屏蔽按鍵格式
+            if ('BLOCKED_EInputKeyType' in line or 'BLOCKED_EInputVrType' in line or
+                'BLOCKED_DIGITAL_KEYS' in line or 'BLOCKED_VR_KEYS' in line or 
+                'BLOCKED_KEYS' in line):
+                continue
+            elif '"' in line and '//' in line and ',' in line:
+                # 提取按鍵名稱
+                try:
+                    key_name = line.split('"')[1]
+                    if key_name:
+                        # 嘗試對應到實際的枚舉名稱
+                        actual_key = name_mapping.get(key_name, name_mapping.get(key_name.lower(), key_name))
+                        if actual_key not in blocked_keys:
+                            blocked_keys.append(actual_key)
+                except IndexError:
+                    continue
+        
+        return blocked_keys
     
     def _extract_udp_config(self, content):
         """從內容中提取 UDP 配置"""
@@ -420,7 +476,7 @@ class AgentMaker:
                 key_name = enum_value.name.replace('INPUT_KEY_', '')
                 self.key_mapping[key_name] = enum_value.number"""
         
-        available_keys_str = "list(self.key_mapping.keys())"
+        available_keys_str = f"[key for key in self.key_mapping.keys() if key not in {game_config['blocked_keys']}]"
         
         prompt = f"""只需要生成純Python程式碼，不要任何說明文字或格式化。
 
@@ -582,7 +638,7 @@ class AutoTestAgent:
 ```
 
 5. **隨機按鍵選擇**：
-使用可用按鍵列表: {available_keys_str}
+使用可用按鍵列表（排除屏蔽按鍵）: {available_keys_str}
 
 6. 必須包含完整的日誌系統：
 - 同時輸出到控制台和 AutoTestAgent.log

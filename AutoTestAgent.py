@@ -46,7 +46,8 @@ class AutoTestAgent:
                 key_name = enum_value.name.replace("INPUT_KEY_", "")
                 self.key_mapping[key_name] = enum_value.number
 
-        self.available_keys = list(self.key_mapping.keys())
+        # 可用按鍵（排除屏蔽按鍵）
+        self.available_keys = [key for key in self.key_mapping.keys() if key not in ["EMERGENCY", "TEST", "LEFT_LEG", "RIGHT_LEG", "SERVICE"]]
 
         signal.signal(signal.SIGINT, self.signal_handler)
         self.initialize_log()
@@ -113,10 +114,43 @@ class AutoTestAgent:
                 time.sleep(5)
         return False
 
+    def process_game_data(self, data):
+        try:
+            game_data = GameFlowData()
+            game_data.ParseFromString(data)
+
+            self.log("📥 接收遊戲數據:")
+            for field in game_data.DESCRIPTOR.fields:
+                field_value = getattr(game_data, field.name)
+                self.log(f"   {field.name}: {field_value}")
+
+            selected_key = self.generate_input(game_data)
+            if selected_key:
+                self.send_input_command(selected_key)
+
+            self.log("=" * 50)
+
+        except Exception as e:
+            self.log(f"處理遊戲數據失敗: {e}")
+
+    def generate_input(self, game_data):
+        if hasattr(game_data, 'current_flow_state'):
+            flow_state = game_data.current_flow_state
+
+            # 檢查是否為有操作邏輯的流程
+            if flow_state in self.target_selections:
+                current_index = getattr(game_data, 'current_option_index', 0)
+                target_option = self.target_selections[flow_state]
+                return self.handle_option_selection(game_data, flow_state, current_index, target_option)
+
+        # 預設隨機輸入
+        return random.choice(self.available_keys)
+
     def handle_option_selection(self, game_data, flow_state, current_index, target_option):
         current_time = time.time()
         flow_key = str(flow_state)
 
+        # 檢查是否已達到目標
         if current_index == target_option:
             if flow_key not in self.target_reached:
                 self.target_reached[flow_key] = current_time
@@ -127,6 +161,7 @@ class AutoTestAgent:
             if flow_key in self.target_reached:
                 del self.target_reached[flow_key]
 
+        # 檢查輸入頻率
         if flow_key in self.last_input_time:
             if current_time - self.last_input_time[flow_key] < 1.0:
                 if flow_key in self.last_index and self.last_index[flow_key] == current_index:
@@ -142,40 +177,33 @@ class AutoTestAgent:
         return self.get_navigation_input(flow_state, current_index, target_option)
 
     def get_navigation_input(self, flow_state, current_index, target_index):
-        return None
+        return "RIGHT"
 
     def get_alternative_input(self, flow_state):
         return "LEFT"
 
-    def process_game_data(self, data):
+    def send_input_command(self, key_name):
         try:
-            game_data = GameFlowData()
-            game_data.ParseFromString(data)
-
-            self.log(f"📥 接收遊戲數據:")
-            for field in game_data.DESCRIPTOR.fields:
-                field_value = getattr(game_data, field.name)
-                self.log(f"   {field.name}: {field_value}")
-
-            selected_key = random.choice(self.available_keys)
-
             input_command = InputCommand()
-            input_command.key_inputs.append(self.key_mapping[selected_key])
+            input_command.key_inputs.append(self.key_mapping[key_name])
             input_command.is_key_down = True
             input_command.timestamp = int(time.time() * 1000)
 
-            self.socket.sendto(input_command.SerializeToString(), (self.host, self.port))
-            self.log(f"📤 發送按鍵: {selected_key}")
-            self.log("=" * 50)
+            data = input_command.SerializeToString()
+            self.socket.sendto(data, (self.host, self.port))
+
+            self.log(f"📤 發送輸入指令: {key_name}")
 
         except Exception as e:
-            self.log(f"處理遊戲數據失敗: {e}")
+            self.log(f"發送輸入指令失敗: {e}")
 
     def listen_loop(self):
         while self.running and self.connected:
             try:
                 data, addr = self.socket.recvfrom(4096)
                 self.process_game_data(data)
+            except socket.timeout:
+                continue
             except Exception as e:
                 self.log(f"❌ 遊戲連線中斷: {e}")
                 self.connected = False
