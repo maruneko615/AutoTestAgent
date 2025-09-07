@@ -313,7 +313,7 @@ class AgentMaker:
         info = {
             "enums": [],
             "messages": [],
-            "input_keys": []  # 新增：提取輸入按鍵
+              # 新增：提取輸入按鍵
         }
         
         lines = content.split('\n')
@@ -337,8 +337,7 @@ class AgentMaker:
             elif in_input_key_enum and '=' in line:
                 # 提取按鍵名稱
                 key_line = line.split('=')[0].strip()
-                if key_line.startswith('INPUT_KEY_'):
-                    info["input_keys"].append(key_line)
+                pass  # 現在使用動態分析，不需要預先提取
                 
         return info
     
@@ -412,21 +411,16 @@ class AgentMaker:
     def _build_generation_prompt(self, game_config, schema_info):
         """建立 Q CLI 生成提示"""
         
-        # 提取實際的按鍵列表
-        input_keys = []
-        if 'InputCommand' in schema_info:
-            input_keys = schema_info['InputCommand'].get('input_keys', [])
         
-        # 生成按鍵映射代碼
-        key_mapping_code = "self.key_mapping = {\n"
-        for key in input_keys[:8]:  # 限制前8個常用按鍵
-            key_name = key.replace('INPUT_KEY_', '')
-            key_mapping_code += f'            "{key_name}": EInputKeyType.{key},\n'
-        key_mapping_code += "        }"
+        # 使用動態按鍵映射 - 讓程式碼自己分析
+        key_mapping_code = """# 動態生成按鍵映射
+        self.key_mapping = {}
+        for enum_value in EInputKeyType.DESCRIPTOR.values:
+            if enum_value.name.startswith('INPUT_KEY_') and enum_value.name != 'INPUT_KEY_MAX':
+                key_name = enum_value.name.replace('INPUT_KEY_', '')
+                self.key_mapping[key_name] = enum_value.number"""
         
-        # 生成可用按鍵列表
-        available_keys = [key.replace('INPUT_KEY_', '') for key in input_keys[:5]]
-        available_keys_str = str(available_keys)
+        available_keys_str = "list(self.key_mapping.keys())"
         
         prompt = f"""只需要生成純Python程式碼，不要任何說明文字或格式化。
 
@@ -598,13 +592,21 @@ class AutoTestAgent:
 - **接收遊戲數據時必須記錄所有欄位**：
   ```python
   self.log(f"📥 接收遊戲數據:")
-  self.log(f"   所有欄位: {{game_data}}")
-  self.log(f"   狀態: {{game_data.current_flow_state}}")
+  for field in game_data.DESCRIPTOR.fields:
+      field_value = getattr(game_data, field.name)
+      self.log(f"   {{field.name}}: {{field_value}}")
   ```
 
 7. 遊戲狀態：{game_config['states']}
-8. 按鍵定義：{input_keys}
-9. UDP配置：{game_config['udp_config']}
+8. 按鍵定義：動態分析 EInputKeyType.DESCRIPTOR.values
+9. **InputCommand 正確使用方式**：
+   ```python
+   input_command = InputCommand()
+   input_command.key_inputs.append(self.key_mapping[selected_key])
+   input_command.is_key_down = True
+   input_command.timestamp = int(time.time() * 1000)
+   ```
+10. UDP配置：{game_config['udp_config']}
 
 10. 必須包含：
 - 路徑修正（在最開頭）

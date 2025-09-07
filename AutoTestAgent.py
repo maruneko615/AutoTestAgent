@@ -23,7 +23,6 @@ import threading
 import time
 import random
 import signal
-from datetime import datetime
 
 class AutoTestAgent:
     def __init__(self):
@@ -32,20 +31,7 @@ class AutoTestAgent:
         self.socket = None
         self.running = False
         self.connected = False
-
-        # 按鍵映射 - 使用實際的 EInputKeyType 枚舉
-        self.key_mapping = {
-            "UP": EInputKeyType.INPUT_KEY_UP,
-            "DOWN": EInputKeyType.INPUT_KEY_DOWN,
-            "LEFT": EInputKeyType.INPUT_KEY_LEFT,
-            "RIGHT": EInputKeyType.INPUT_KEY_RIGHT,
-            "START": EInputKeyType.INPUT_KEY_START,
-            "NITRO": EInputKeyType.INPUT_KEY_NITRO,
-            "TEST": EInputKeyType.INPUT_KEY_TEST,
-            "SERVICE": EInputKeyType.INPUT_KEY_SERVICE,
-        }
-
-        self.available_keys = ["UP", "DOWN", "LEFT", "RIGHT", "START"]
+        self.log_file = None
 
         # 智能選項選擇相關
         self.target_selections = {}
@@ -53,13 +39,39 @@ class AutoTestAgent:
         self.last_index = {}
         self.target_reached = {}
 
+        # 動態生成按鍵映射
+        self.key_mapping = {}
+        for enum_value in EInputKeyType.DESCRIPTOR.values:
+            if enum_value.name.startswith("INPUT_KEY_") and enum_value.name != "INPUT_KEY_MAX":
+                key_name = enum_value.name.replace("INPUT_KEY_", "")
+                self.key_mapping[key_name] = enum_value.number
+
+        self.available_keys = list(self.key_mapping.keys())
+
         signal.signal(signal.SIGINT, self.signal_handler)
+        self.initialize_log()
         self.initialize_targets()
 
     def signal_handler(self, signum, frame):
         self.log("程式已停止")
         self.running = False
+        if self.log_file:
+            self.log_file.close()
         sys.exit(0)
+
+    def initialize_log(self):
+        try:
+            self.log_file = open("AutoTestAgent.log", "w", encoding="utf-8")
+        except Exception as e:
+            print(f"無法創建日誌文件: {e}")
+
+    def log(self, message):
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        log_message = f"[{timestamp}] {message}"
+        print(log_message)
+        if self.log_file:
+            self.log_file.write(log_message + "\n")
+            self.log_file.flush()
 
     def initialize_targets(self):
         flow_options = {}
@@ -70,44 +82,24 @@ class AutoTestAgent:
                 self.target_selections[flow] = target
                 self.log(f"🎯 {flow} 流程目標: {target}")
 
-    def log(self, message):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_message = f"[{timestamp}] {message}"
-        print(log_message)
-        sys.stdout.flush()
-
-        try:
-            with open("AutoTestAgent.log", "a", encoding="utf-8") as f:
-                f.write(log_message + "\n")
-                f.flush()
-        except Exception as e:
-            print(f"日誌寫入失敗: {e}")
-
     def create_socket(self):
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.socket.settimeout(5.0)
             return True
         except Exception as e:
-            self.log(f"Socket 創建失敗: {e}")
+            self.log(f"創建 Socket 失敗: {e}")
             return False
 
     def register_role(self):
         try:
-            role_message = "role:agent"
-            self.socket.sendto(role_message.encode(), (self.host, self.port))
-
+            self.socket.sendto(b"role:agent", (self.host, self.port))
             response, addr = self.socket.recvfrom(1024)
-            response_str = response.decode()
-
-            if response_str == "ok:agent":
+            if response.decode() == "ok:agent":
                 return True
-            else:
-                self.log(f"角色註冊失敗，收到回應: {response_str}")
-                return False
         except Exception as e:
             self.log(f"角色註冊失敗: {e}")
-            return False
+        return False
 
     def connect_to_game(self):
         while self.running:
@@ -161,17 +153,18 @@ class AutoTestAgent:
             game_data.ParseFromString(data)
 
             self.log(f"📥 接收遊戲數據:")
-            self.log(f"   所有欄位: {game_data}")
-            self.log(f"   狀態: {game_data.current_flow_state}")
+            for field in game_data.DESCRIPTOR.fields:
+                field_value = getattr(game_data, field.name)
+                self.log(f"   {field.name}: {field_value}")
 
             selected_key = random.choice(self.available_keys)
 
             input_command = InputCommand()
-            input_command.key_type = self.key_mapping[selected_key]
+            input_command.key_inputs.append(self.key_mapping[selected_key])
+            input_command.is_key_down = True
+            input_command.timestamp = int(time.time() * 1000)
 
-            command_data = input_command.SerializeToString()
-            self.socket.sendto(command_data, (self.host, self.port))
-
+            self.socket.sendto(input_command.SerializeToString(), (self.host, self.port))
             self.log(f"📤 發送按鍵: {selected_key}")
             self.log("=" * 50)
 
@@ -209,5 +202,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 

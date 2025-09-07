@@ -42,7 +42,7 @@ AgentMaker 是使用 Q CLI 根據配置文件和 Protobuf Schema 生成 AutoTest
 - **特性**: 
   - UDP 通訊功能
   - 動態按鍵映射
-  - 即時日誌系統
+  - 動態日誌系統 (使用 game_data.DESCRIPTOR.fields 遍歷所有欄位)
   - 持續監聽與自動重連
   - Windows 友善的錯誤處理
 
