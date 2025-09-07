@@ -19,10 +19,10 @@ except ImportError as e:
     sys.exit(1)
 
 import socket
-import threading
 import time
 import random
 import signal
+import threading
 from datetime import datetime
 
 class AutoTestAgent:
@@ -32,7 +32,7 @@ class AutoTestAgent:
         self.socket = None
         self.running = False
         self.connected = False
-        self.log_file = "AutoTestAgentLog.txt"
+        self.log_file = "AutoTestAgent.log"
 
         # 按鍵映射 - 使用實際的 EInputKeyType 枚舉
         self.key_mapping = {
@@ -69,6 +69,8 @@ class AutoTestAgent:
 
     def create_socket(self):
         try:
+            if self.socket:
+                self.socket.close()
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.socket.settimeout(5.0)
             return True
@@ -78,12 +80,17 @@ class AutoTestAgent:
 
     def register_role(self):
         try:
-            self.socket.sendto(b"role:agent", (self.host, self.port))
+            register_message = "role:agent"
+            self.socket.sendto(register_message.encode(), (self.host, self.port))
+
             response, addr = self.socket.recvfrom(1024)
-            if response == b"ok:agent":
+            response_str = response.decode()
+
+            if response_str == "ok:agent":
+                self.log("角色註冊成功")
                 return True
             else:
-                self.log(f"角色註冊失敗，收到回應: {response}")
+                self.log(f"角色註冊失敗，回應: {response_str}")
                 return False
         except Exception as e:
             self.log(f"角色註冊失敗: {e}")
@@ -107,8 +114,10 @@ class AutoTestAgent:
             game_data.ParseFromString(data)
 
             self.log(f"📥 接收遊戲數據:")
-            self.log(f"   所有欄位: {game_data}")
-            self.log(f"   狀態: {game_data.current_flow_state}")
+            for field in game_data.DESCRIPTOR.fields:
+                field_name = field.name
+                field_value = getattr(game_data, field_name)
+                self.log(f"   {field_name}: {field_value}")
             self.log("=" * 50)
 
             self.send_random_input()
@@ -118,15 +127,20 @@ class AutoTestAgent:
 
     def send_random_input(self):
         try:
-            random_key = random.choice(self.available_keys)
-
             input_command = InputCommand()
-            input_command.input_key = self.key_mapping[random_key]
 
-            serialized_data = input_command.SerializeToString()
-            self.socket.sendto(serialized_data, (self.host, self.port))
+            random_key = random.choice(self.available_keys)
+            input_command.key_inputs.append(self.key_mapping[random_key])
+            input_command.is_key_down = True
+            input_command.timestamp = int(time.time() * 1000)
 
-            self.log(f"📤 發送輸入指令: {random_key}")
+            message = input_command.SerializeToString()
+            self.socket.sendto(message, (self.host, self.port))
+
+            self.log(f"📤 發送輸入指令:")
+            self.log(f"   按鍵: {random_key}")
+            self.log(f"   狀態: 按下")
+            self.log(f"   時間戳: {input_command.timestamp}")
             self.log("=" * 50)
 
         except Exception as e:
@@ -137,6 +151,8 @@ class AutoTestAgent:
             try:
                 data, addr = self.socket.recvfrom(4096)
                 self.process_game_data(data)
+            except socket.timeout:
+                continue
             except Exception as e:
                 self.log(f"❌ 遊戲連線中斷: {e}")
                 self.connected = False
@@ -144,21 +160,26 @@ class AutoTestAgent:
 
     def run(self):
         self.running = True
+        self.log("AutoTestAgent 啟動")
+
         while self.running:
             if self.connect_to_game():
                 self.listen_loop()
+
+            if self.running:
+                self.log("❌ 遊戲連線中斷，5秒後重試...")
+                time.sleep(5)
 
 def main():
     try:
         agent = AutoTestAgent()
         agent.run()
     except KeyboardInterrupt:
-        print("程式已停止")
+        print("\n程式已停止")
     except Exception as e:
         print(f"程式執行錯誤: {e}")
         input("按 Enter 鍵結束...")
 
 if __name__ == "__main__":
     main()
-
 

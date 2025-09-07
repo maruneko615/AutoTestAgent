@@ -5,22 +5,3 @@ AgentMaker.py有任何修改都要確認是否和功能需求規格.md中的Agen
 
 目前主要執行的工具是AgentMaker，用來產生AutoTestAgent用的工具，
 因此AutoTestAgent有任何錯誤，都要修改AgentMaker來讓產生的AutoTestAgent正確執行
-
-
-## 最新修復記錄 (2025-09-07)
-
-### 持續監聽功能
-- ✅ AgentMaker 已修改，生成的 AutoTestAgent 具備持續監聽功能
-- ✅ 程式啟動後會持續嘗試連接遊戲，連線失敗時每5秒重試
-- ✅ 支援 Ctrl+C 優雅退出
-
-### Protobuf 按鍵映射修復
-- ✅ 修正 `'InputCommand' has no attribute 'INPUT_KEY_UP'` 錯誤
-- ✅ 正確導入 `EInputKeyType` 枚舉
-- ✅ 使用 `EInputKeyType.INPUT_KEY_UP` 格式引用按鍵
-- ✅ 支援不同遊戲的 proto 文件切換
-
-### 當前狀態
-- AgentMaker 可正確處理不同遊戲的配置文件
-- AutoTestAgent 具備完整的持續監聽和自動重連功能
-- 所有按鍵映射問題已解決

@@ -1,0 +1,22 @@
+🚀 啟動 AgentMaker...
+📋 檢查輸入文件...
+✅ GameSetting.md
+✅ GameFlowData.proto
+✅ GameFlowData_pb2.py
+✅ InputCommand.proto
+✅ InputCommand_pb2.py
+✅ 所有輸入文件檢查完成
+📋 分析 GameSetting.md...
+✅ 發現 1 個遊戲狀態
+✅ 發現 2 個按鍵定義
+🔍 分析 Protobuf Schema...
+✅ 分析完成: GameFlowData.proto
+✅ 分析完成: InputCommand.proto
+🤖 呼叫 Q CLI 生成程式碼...
+🪟 檢測到 Windows 環境，使用 WSL 執行 Q CLI...
+Q CLI 返回碼: 0
+Q CLI 輸出長度: 5664 字符
+✅ Q CLI 執行成功
+📄 程式碼已儲存: E:\AutoTestAgent\AutoTestAgent.py (5989 bytes)
+✅ 程式碼品質檢查通過
+✅ AutoTestAgent 生成完成，品質檢查通過

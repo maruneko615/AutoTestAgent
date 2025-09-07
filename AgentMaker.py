@@ -15,7 +15,7 @@ class AgentMaker:
         self.project_root = Path(__file__).parent
         self.game_setting_path = self.project_root / "GameSetting" / "AutoTest_Game_Setting.md"
         self.proto_schema_path = self.project_root / "ProtoSchema"
-        self.log_file = self.project_root / "AgentMakerLog.txt"
+        self.log_file = self.project_root / "AgentMaker.log"
         
         # 功能需求規格要求的輸入文件
         self.required_files = {
@@ -455,7 +455,7 @@ class AutoTestAgent:
 使用可用按鍵列表: {available_keys_str}
 
 6. 必須包含完整的日誌系統：
-- 同時輸出到控制台和 AutoTestAgentLog.txt
+- 同時輸出到控制台和 AutoTestAgent.log
 - 每個重要操作都要記錄
 - 包含時間戳記
 - 使用 flush() 確保即時寫入
