@@ -339,21 +339,99 @@ class AgentMaker:
         """建立 Q CLI 生成提示"""
         prompt = f"""只需要生成純Python程式碼，不要任何說明文字或格式化。
 
-生成 AutoTestAgent.py：
+生成 AutoTestAgent.py，專門為Windows環境設計，具備持續監聽功能：
 
-1. 使用真實 Protobuf 導入：
-from ProtoSchema.GameFlowData_pb2 import GameFlowData
-from ProtoSchema.InputCommand_pb2 import InputCommand
+1. 必須包含路徑修正和Protobuf導入：
+```python
+import sys
+import os
 
-2. 遊戲狀態：{game_config['states']}
-3. 按鍵定義：{game_config['keys']}
-4. UDP配置：{game_config['udp_config']}
+# 確保正確的工作目錄和路徑
+script_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_dir)
+sys.path.insert(0, script_dir)
 
-5. 必須包含：
+try:
+    from ProtoSchema.GameFlowData_pb2 import GameFlowData
+    from ProtoSchema.InputCommand_pb2 import InputCommand
+    print("✅ Protobuf 模組載入成功")
+except ImportError as e:
+    print(f"❌ 無法導入 Protobuf 模組: {{e}}")
+    input("按 Enter 鍵結束...")
+    sys.exit(1)
+```
+
+2. **持續監聽機制**（重要）：
+- 程式啟動後顯示 "🔄 等待遊戲連線..." 並持續嘗試連接
+- 連線失敗時每5秒重試一次，不退出程式
+- 連線成功後顯示 "✅ 遊戲連線成功，開始接收數據"
+- 連線中斷時顯示 "❌ 遊戲連線中斷，5秒後重試..." 並自動重連
+- 支援 Ctrl+C 優雅退出，顯示 "程式已停止"
+- 使用 signal.signal(signal.SIGINT, signal_handler) 處理中斷
+
+3. **核心架構**：
+```python
+class AutoTestAgent:
+    def __init__(self):
+        self.host = "127.0.0.1"
+        self.port = 8587
+        self.socket = None
+        self.running = False
+        self.connected = False
+        signal.signal(signal.SIGINT, self.signal_handler)
+    
+    def signal_handler(self, signum, frame):
+        self.log("程式已停止")
+        self.running = False
+        sys.exit(0)
+    
+    def connect_to_game(self):
+        while self.running:
+            self.log("🔄 等待遊戲連線...")
+            if self.create_socket() and self.register_role():
+                self.connected = True
+                self.log("✅ 遊戲連線成功，開始接收數據")
+                return True
+            else:
+                self.log("❌ 遊戲連線失敗，5秒後重試...")
+                time.sleep(5)
+        return False
+    
+    def listen_loop(self):
+        while self.running and self.connected:
+            try:
+                data, addr = self.socket.recvfrom(4096)
+                self.process_game_data(data)
+            except Exception as e:
+                self.log(f"❌ 遊戲連線中斷: {{e}}")
+                self.connected = False
+                break
+    
+    def run(self):
+        self.running = True
+        while self.running:
+            if self.connect_to_game():
+                self.listen_loop()
+```
+
+4. 必須包含完整的日誌系統：
+- 同時輸出到控制台和 AutoTestAgentLog.txt
+- 每個重要操作都要記錄
+- 包含時間戳記
+- 使用 flush() 確保即時寫入
+
+5. 遊戲狀態：{game_config['states']}
+6. 按鍵定義：{game_config['keys']}
+7. UDP配置：{game_config['udp_config']}
+
+8. 必須包含：
+- 路徑修正（在最開頭）
+- 完整日誌系統（同時輸出到控制台和檔案）
 - UDP通訊 + 角色註冊 ("role:agent" → "ok:agent")
-- FSM狀態機架構
+- 持續監聽循環，連線失敗時自動重試
 - 每個狀態的隨機輸入處理
-- 即時日誌輸出
+- 信號處理機制支援 Ctrl+C 優雅退出
+- main函數使用 try/except KeyboardInterrupt
 
 只輸出完整的Python程式碼，從#!/usr/bin/env python3開始。"""
         return prompt
