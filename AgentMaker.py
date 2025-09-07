@@ -502,6 +502,12 @@ class AutoTestAgent:
             agent_code = self.generate_agent_code(game_config, schema_info)
             
             if agent_code:
+                # 儲存 Q CLI 原始輸出
+                raw_output_path = self.project_root / "AutoTestAgent_AgentMaker_Raw.py"
+                with open(raw_output_path, 'w', encoding='utf-8') as f:
+                    f.write(agent_code)
+                self.log(f"📄 Q CLI 原始輸出已儲存: {raw_output_path}")
+                
                 # 先儲存程式碼，再檢查品質
                 output_path = self.project_root / "AutoTestAgent.py"
                 with open(output_path, 'w', encoding='utf-8') as f:

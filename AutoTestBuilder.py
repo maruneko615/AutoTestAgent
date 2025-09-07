@@ -52,32 +52,145 @@ class AutoTestBuilder:
             return f.read()
     
     def build_qcli_prompt(self, user_command, game_setting_content, base_agent_content):
-        """建構 Q CLI 提示詞"""
-        prompt = f"""只需要生成純Python的可執行的程式碼，不要任何說明文字或格式化。
+        """建構 Q CLI 提示詞 - 動態提取配置"""
+        
+        # 動態提取遊戲狀態
+        states = self._extract_states(game_setting_content)
+        
+        # 動態提取按鍵定義
+        keys = self._extract_keys(game_setting_content)
+        
+        # 動態提取 UDP 配置
+        udp_config = self._extract_udp_config(game_setting_content)
+        
+        # 生成按鍵映射代碼
+        key_mapping_code = "self.key_mapping = {\n"
+        for key in keys[:8]:  # 限制前8個常用按鍵
+            key_name = key.replace('INPUT_KEY_', '') if key.startswith('INPUT_KEY_') else key
+            key_mapping_code += f'            "{key_name}": EInputKeyType.INPUT_KEY_{key_name},\n'
+        key_mapping_code += "        }"
+        
+        # 生成可用按鍵列表
+        available_keys = [key.replace('INPUT_KEY_', '') if key.startswith('INPUT_KEY_') else key for key in keys[:5]]
+        available_keys_str = str(available_keys)
+        
+        prompt = f"""只需要生成純Python程式碼，不要任何說明文字或格式化。
 
-根據用戶指令和遊戲配置，修改 AutoTestAgent 生成定制化版本。
+根據用戶指令生成定制化的 AutoTestAgent.py，專門為Windows環境設計：
 
 用戶指令: {user_command}
 
-遊戲配置 (GameSetting.md):
-{game_setting_content}
+1. 必須包含路徑修正和Protobuf導入：
+```python
+import sys
+import os
 
-基礎 AutoTestAgent 程式碼:
-{base_agent_content}
+# 確保正確的工作目錄和路徑
+script_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_dir)
+sys.path.insert(0, script_dir)
 
-請分析用戶指令，理解需要在哪個遊戲狀態下執行什麼操作，然後修改 AutoTestAgent 的邏輯：
+try:
+    from ProtoSchema.GameFlowData_pb2 import GameFlowData
+    from ProtoSchema.InputCommand_pb2 import InputCommand, EInputKeyType
+    print("✅ Protobuf 模組載入成功")
+except ImportError as e:
+    print(f"❌ 無法導入 Protobuf 模組: {{e}}")
+    input("按 Enter 鍵結束...")
+    sys.exit(1)
+```
 
-1. 在檔案開頭加上定制化指令註解
-2. 修改日誌檔名為 AutoTestAgent_Custom.log
-3. 在 __init__ 方法中記錄定制化指令
-4. 根據用戶指令修改 send_random_input 方法的邏輯
-5. 確保在指定的遊戲狀態下執行用戶要求的操作
+2. 動態按鍵映射：
+```python
+# 按鍵映射 - 使用實際的 EInputKeyType 枚舉
+{key_mapping_code}
+```
 
-只輸出完整的 Python 程式碼，不要任何說明文字或markdown格式。
-不要使用 ```python 或 ``` 標記。
-直接從 #!/usr/bin/env python3 開始輸出。"""
+3. 定制化邏輯：
+- 檔案開頭註解: # 定制化指令: {user_command}
+- 日誌檔名: AutoTestAgent_Custom.log
+- 根據用戶指令在特定遊戲狀態執行特定操作
+- 其他狀態使用隨機輸入
+
+4. 遊戲狀態：{states}
+5. 按鍵定義：{keys}
+6. UDP配置：{udp_config}
+7. 可用按鍵：{available_keys_str}
+
+8. 必須包含完整的：
+- UDP通訊 + 角色註冊機制
+- 持續監聽與自動重連
+- 日誌系統（控制台+檔案）
+- 信號處理支援 Ctrl+C
+
+只輸出完整的Python程式碼，從#!/usr/bin/env python3開始。"""
         
         return prompt
+    
+    def _extract_states(self, content):
+        """從內容中提取遊戲狀態"""
+        states = []
+        lines = content.split('\n')
+        in_enum = False
+        
+        for line in lines:
+            # 動態識別包含 "Flow" 或 "State" 的 enum
+            if 'enum' in line and ('Flow' in line or 'State' in line):
+                in_enum = True
+                continue
+            if in_enum and '}' in line:
+                in_enum = False
+                continue
+            if in_enum and '=' in line:
+                state_name = line.strip().split('=')[0].strip().rstrip(',')
+                if state_name and not state_name.startswith('//'):
+                    states.append(state_name)
+                    
+        return states
+    
+    def _extract_keys(self, content):
+        """從內容中提取按鍵定義"""
+        keys = []
+        lines = content.split('\n')
+        in_enum = False
+        
+        for line in lines:
+            # 動態識別包含 "Key" 或 "Input" 的 enum
+            if 'enum' in line and ('Key' in line or 'Input' in line):
+                in_enum = True
+                continue
+            if in_enum and '}' in line:
+                in_enum = False
+                continue
+            if in_enum and '=' in line:
+                key_name = line.strip().split('=')[0].strip().rstrip(',')
+                if key_name and not key_name.startswith('//'):
+                    keys.append(key_name)
+                    
+        return keys
+    
+    def _extract_udp_config(self, content):
+        """從內容中提取 UDP 配置"""
+        lines = content.split('\n')
+        config = {"host": "127.0.0.1", "port": 8587}  # 預設值
+        
+        for line in lines:
+            line = line.strip()
+            # 查找 UDP 相關配置
+            if 'UDPSOCKET_URL' in line and '=' in line:
+                url = line.split('=')[1].strip().strip('"\'')
+                # 解析 udp://host:port 格式
+                if url.startswith('udp://'):
+                    host_port = url[6:]  # 移除 udp://
+                    if ':' in host_port:
+                        host, port = host_port.split(':', 1)
+                        try:
+                            config["host"] = host
+                            config["port"] = int(port)
+                        except ValueError:
+                            pass
+                
+        return config
     
     def _get_q_command(self):
         """根據執行環境選擇適當的 Q CLI 命令"""
@@ -129,13 +242,18 @@ class AutoTestBuilder:
             
             if result.returncode == 0 and result.stdout:
                 self.log("✅ Q CLI 執行成功")
-                
-                # 調試：記錄原始輸出的前100個字符
-                raw_preview = result.stdout[:100].replace('\n', '\\n')
-                self.log(f"🔍 原始輸出預覽: {raw_preview}")
-                
-                # 直接使用原始輸出
-                return result.stdout
+                # 提取純程式碼，移除 Q CLI 的格式化輸出
+                clean_code = self._extract_code_from_output(result.stdout)
+                if clean_code and len(clean_code.strip()) > 100:  # 檢查是否有實際程式碼內容
+                    return clean_code
+                else:
+                    # 如果提取失敗，直接使用原始輸出（可能已經是純程式碼）
+                    if result.stdout.strip().startswith('#!/usr/bin/env python3') or 'import' in result.stdout[:200]:
+                        self.log("✅ 檢測到純程式碼輸出")
+                        return result.stdout.strip()
+                    else:
+                        self.log("⚠️ 程式碼提取結果為空，使用原始輸出")
+                        return result.stdout
             else:
                 self.log(f"❌ Q CLI 執行失敗")
                 self.log(f"返回碼: {result.returncode}")
@@ -153,38 +271,33 @@ class AutoTestBuilder:
         return ansi_escape.sub('', text)
     
     def _extract_code_from_output(self, output):
-        """從 Q CLI 輸出中提取純程式碼"""
+        """從 Q CLI 輸出中提取純程式碼 - 強化 WSL 修復"""
         # 移除 ANSI 顏色代碼
         clean_output = self._remove_ansi_codes(output)
         
-        # 強化 WSL 格式檢測：檢查是否每個字符都分行
+        # 檢測 WSL 格式問題：每個字符分行
         lines = clean_output.split('\n')
-        if len(lines) > 20:
-            # 檢查前20行是否都是單字符或很短
-            single_char_count = sum(1 for line in lines[:20] if len(line.strip()) <= 2)
-            if single_char_count >= 15:  # 如果大部分都是單字符，認為是 WSL 格式問題
-                self.log("🔧 檢測到 WSL 格式問題，重組內容...")
-                # 重組所有非空行
+        if len(lines) > 100:  # 如果行數異常多
+            # 檢查是否大部分行都是單字符
+            single_char_lines = [line for line in lines if len(line.strip()) == 1]
+            if len(single_char_lines) > len(lines) * 0.7:  # 70% 以上是單字符行
+                self.log("🔧 檢測到嚴重的 WSL 格式問題，重組程式碼...")
+                # 直接連接所有非空行
                 rejoined = ''.join(line.strip() for line in lines if line.strip())
+                # 在關鍵位置插入換行
+                rejoined = rejoined.replace('#!/usr/bin/env python3', '#!/usr/bin/env python3\n')
+                rejoined = rejoined.replace('# -*- coding: utf-8 -*-', '\n# -*- coding: utf-8 -*-\n')
+                rejoined = rejoined.replace('import ', '\nimport ')
+                rejoined = rejoined.replace('from ', '\nfrom ')
+                rejoined = rejoined.replace('class ', '\n\nclass ')
+                rejoined = rejoined.replace('def ', '\n    def ')
+                rejoined = rejoined.replace('if __name__', '\n\nif __name__')
                 clean_output = rejoined
-                self.log(f"🔧 重組後內容預覽: {clean_output[:100]}")
+                self.log(f"🔧 WSL 格式修復完成")
         
         # 如果已經是純程式碼，直接返回
         if clean_output.strip().startswith('#!/usr/bin/env python3'):
             return clean_output.strip()
-        
-        # 嘗試提取 ```python 程式碼區塊
-        if '```python' in clean_output:
-            start_marker = '```python'
-            end_marker = '```'
-            start_idx = clean_output.find(start_marker)
-            if start_idx != -1:
-                start_idx += len(start_marker)
-                end_idx = clean_output.find(end_marker, start_idx)
-                if end_idx != -1:
-                    code_block = clean_output[start_idx:end_idx].strip()
-                    if code_block and ('#!/usr/bin/env python3' in code_block or 'import' in code_block[:200]):
-                        return code_block
         
         # 否則嘗試提取程式碼區塊
         lines = clean_output.split('\n')
@@ -238,6 +351,91 @@ class AutoTestBuilder:
             self.log(f"❌ 程式碼編譯錯誤: {e}")
             return False
     
+    def _clean_generated_code(self, code):
+        """清理生成的程式碼，修復常見問題"""
+        if not code:
+            return code
+            
+        # 檢測並修復 WSL 格式問題（每個字符分行）
+        lines = code.split('\n')
+        if len(lines) > 50:  # 如果行數過多，可能是 WSL 格式問題
+            # 檢查前20行是否大部分都是單字符
+            single_char_count = sum(1 for line in lines[:20] if len(line.strip()) <= 2 and line.strip())
+            if single_char_count >= 15:  # 如果大部分都是單字符
+                self.log("🔧 檢測到 WSL 格式問題，重組程式碼...")
+                # 重組所有非空行
+                rejoined = ''.join(line.strip() for line in lines if line.strip())
+                # 嘗試重新格式化為正常的 Python 程式碼
+                code = self._reformat_python_code(rejoined)
+                self.log(f"🔧 重組完成，程式碼長度: {len(code)}")
+            
+        # 移除開頭的 > 符號
+        if code.startswith('> #!/usr/bin/env python3'):
+            code = code[2:]  # 移除 "> "
+            
+        # 修復常見的語法錯誤
+        code = code.replace('def init(self):', 'def __init__(self):')
+        code = code.replace('self.log("="  50)', 'self.log("=" * 50)')
+        code = code.replace('def sendinput_based_on_state', 'def send_input_based_on_state')
+        code = code.replace('time.time()  1000', 'time.time() * 1000')
+        code = code.replace('inputcommand', 'input_command')
+        code = code.replace('if name == "__main__":', 'if __name__ == "__main__":')
+        
+        # 移除非 ASCII 字符（保留中文註解）
+        lines = code.split('\n')
+        clean_lines = []
+        for line in lines:
+            # 如果行包含註解且有中文，保留
+            if '#' in line and any('\u4e00' <= char <= '\u9fff' for char in line):
+                clean_lines.append(line)
+            else:
+                # 否則移除非 ASCII 控制字符
+                clean_line = ''.join(char for char in line if ord(char) >= 32 or char in '\t\n\r')
+                clean_lines.append(clean_line)
+                
+        return '\n'.join(clean_lines)
+    
+    def _reformat_python_code(self, joined_code):
+        """重新格式化被 WSL 破壞的 Python 程式碼"""
+        # 基本的 Python 關鍵字和結構
+        keywords = [
+            '#!/usr/bin/env python3',
+            '# -*- coding: utf-8 -*-',
+            'import ', 'from ', 'class ', 'def ', 'if ', 'else:', 'elif ', 'try:', 'except',
+            'for ', 'while ', 'return ', 'self.', 'print(', '__init__', '__name__'
+        ]
+        
+        result = []
+        i = 0
+        current_line = ""
+        
+        while i < len(joined_code):
+            # 檢查是否匹配關鍵字
+            matched = False
+            for keyword in keywords:
+                if joined_code[i:].startswith(keyword):
+                    if current_line.strip():
+                        result.append(current_line)
+                        current_line = ""
+                    current_line = keyword
+                    i += len(keyword)
+                    matched = True
+                    break
+            
+            if not matched:
+                current_line += joined_code[i]
+                i += 1
+                
+            # 檢查是否應該換行
+            if current_line.endswith(':') or current_line.endswith('"""') or len(current_line) > 80:
+                result.append(current_line)
+                current_line = ""
+        
+        if current_line.strip():
+            result.append(current_line)
+            
+        return '\n'.join(result)
+    
     def process_command(self, command):
         """統一的指令處理流程"""
         self.log(f"📋 接收指令: {command}")
@@ -258,13 +456,15 @@ class AutoTestBuilder:
         if not qcli_output:
             return False
         
-        # 需要提取程式碼來修復 WSL 格式問題
+        # 提取程式碼
         custom_code = self.extract_python_code(qcli_output)
         
-        # 暫時跳過驗證，直接儲存
-        # if not self._validate_generated_code(custom_code):
-        #     self.log("❌ 生成的程式碼驗證失敗")
-        #     return False
+        # 清理程式碼
+        custom_code = self._clean_generated_code(custom_code)
+        
+        # 驗證程式碼品質
+        if not self._validate_generated_code(custom_code):
+            self.log("⚠️ 程式碼驗證失敗，但仍會儲存")
         
         # 儲存定制化版本
         with open(self.output_path, 'w', encoding='utf-8') as f:

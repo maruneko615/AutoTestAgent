@@ -1,11 +1,29 @@
-[2025-09-07 16:40:10] 🚀 AutoTestBuilder 互動模式啟動
-[2025-09-07 16:40:10] 輸入自然語言指令，例如: '每次都選首爾'
-[2025-09-07 16:40:14] 📋 接收指令: 每次都選拉斯維加斯
-[2025-09-07 16:40:14] 🤖 呼叫 Q CLI 進行程式碼生成...
-[2025-09-07 16:40:14] 🪟 檢測到 Windows 環境，使用 WSL 執行 Q CLI...
-[2025-09-07 16:40:53] Q CLI 返回碼: 0
-[2025-09-07 16:40:53] Q CLI 輸出長度: 8846 字符
-[2025-09-07 16:40:53] ✅ Q CLI 執行成功
-[2025-09-07 16:40:53] 🔍 原始輸出預覽: #\n!\n/\nusr\n/\nbin\n/\nenv\n\npython3[0m[0m\n[38;5;13m[1m# \n-\n*\n-\n\ncoding\n:\n\nutf\n-\n8\n\n-\n*\n-[0m[0m\n[38
-[2025-09-07 16:40:53] ✅ 定制化 AutoTestAgent 已生成: E:\AutoTestAgent\AutoTestAgent_Custom.py
-[2025-09-07 16:40:53] ✅ 定制化測試工具建置完成
+[2025-09-07 17:53:32] 🚀 AutoTestBuilder 互動模式啟動
+[2025-09-07 17:53:32] 輸入自然語言指令，例如: '每次都選首爾'
+[2025-09-07 17:53:40] 📋 接收指令: 每次都選拉斯維加斯
+[2025-09-07 17:53:40] 🤖 呼叫 Q CLI 進行程式碼生成...
+[2025-09-07 17:53:40] 🪟 檢測到 Windows 環境，使用 WSL 執行 Q CLI...
+[2025-09-07 17:54:34] Q CLI 返回碼: 0
+[2025-09-07 17:54:34] Q CLI 輸出長度: 5231 字符
+[2025-09-07 17:54:34] Q CLI 錯誤: [1mWelcome to [96mAmazon Q[39m![22m
+
+💡 Use [92m/model[39m to select the model to use for this conversation
+
+[92m/help[90m all commands
+[92mctrl + j[90m new lines
+[92mctrl + s[90m fuzzy search
+[39m
+[38;5;8m[39m
+[39m[92mAll tools are now trusted ([91m![92m). Amazon Q will execute tools [1mwithout[22m asking for confirmation.
+Agents can sometimes do unexpected things so understand the risks.[39m
+
+Learn more at https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-chat-security.html#command-line-chat-trustall-safety
+
+[38;5;14m🤖 You are chatting with claude-sonnet-4
+[39m
+
+[38;5;13m[39m[?25l[0m[0m[1G[0m[0m[?25h
+[2025-09-07 17:54:34] ✅ Q CLI 執行成功
+[2025-09-07 17:54:34] ✅ 程式碼語法檢查通過
+[2025-09-07 17:54:34] ✅ 定制化 AutoTestAgent 已生成: D:\AutoTestAgent\AutoTestAgent_Custom.py
+[2025-09-07 17:54:34] ✅ 定制化測試工具建置完成
