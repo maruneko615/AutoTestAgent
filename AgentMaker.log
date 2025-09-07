@@ -15,11 +15,13 @@
 🤖 呼叫 Q CLI 生成程式碼...
 🪟 檢測到 Windows 環境，使用 WSL 執行 Q CLI...
 Q CLI 返回碼: 0
-Q CLI 輸出長度: 5470 字符
+Q CLI 輸出長度: 6882 字符
 Q CLI 錯誤: [1mWelcome to [96mAmazon Q[39m![22m
 
-💡 Get notified whenever Q CLI finishes responding.
-    Just run [92mq settings chat.enableNotifications true[39m
+💡 You can
+    specify wait time (in ms) for mcp server loading with [92mq settings mcp.initTimeout {timeout in
+    int}[39m. Servers that takes longer than the specified time will continue to load in the background. Use
+    /tools to see pending servers.
 
 [92m/help[90m all commands
 [92mctrl + j[90m new lines
@@ -36,10 +38,6 @@ Learn more at https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-l
 
 [38;5;13m[39m[?25l[0m[0m[1G[0m[0m[?25h
 ✅ Q CLI 執行成功
-📄 Q CLI 原始輸出已儲存: D:\AutoTestAgent\AutoTestAgent_AgentMaker_Raw.py
-📄 程式碼已儲存: D:\AutoTestAgent\AutoTestAgent.py (5775 bytes)
+📄 程式碼已儲存: D:\AutoTestAgent\AutoTestAgent.py (7127 bytes)
 ✅ 程式碼品質檢查通過
 ✅ AutoTestAgent 生成完成，品質檢查通過
-📊 對比文件:
-   AgentMaker 原始輸出: D:\AutoTestAgent\AutoTestAgent_AgentMaker_Raw.py
-   AgentMaker 最終版本: D:\AutoTestAgent\AutoTestAgent.py

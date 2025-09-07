@@ -245,6 +245,66 @@ class AgentMaker:
                 
         return config
     
+    def _generate_flow_options_code(self, game_config, states):
+        """根據 GameSetting.md 的「2. 需要操作的流程」生成流程選項代碼"""
+        code_lines = []
+        
+        # 重要：只處理 GameSetting.md「2. 需要操作的流程」中有「操作邏輯」的流程
+        # 需要解析 GameSetting.md 找出哪些流程有操作邏輯內容
+        
+        # 範例：根據實際 GameSetting.md 內容動態生成
+        # 如果 SelectScene 有操作邏輯，則加入目標選項
+        # 如果 SelectBike 有操作邏輯，則加入目標選項
+        
+        code_lines.append('            # 根據 GameSetting.md「2. 需要操作的流程」動態生成')
+        code_lines.append('            # 只包含有操作邏輯的流程')
+        
+        # 這裡需要實際解析 GameSetting.md 來確定哪些流程有操作邏輯
+        flow_mappings = {
+            "SelectScene": "ETrack",  # 如果賽道選擇有操作邏輯
+            "SelectBike": "EBike",    # 如果車輛選擇有操作邏輯
+        }
+        
+        for flow_state, enum_type in flow_mappings.items():
+            if flow_state in [state.strip() for state in states]:
+                code_lines.append(f'            "{flow_state}": ["Option1", "Option2", "Option3"],  # {enum_type} 枚舉選項')
+        
+        return '\n'.join(code_lines) if len(code_lines) > 2 else '            # 無有操作邏輯的流程'
+    
+    def _generate_navigation_logic(self, game_config):
+        """根據 GameSetting.md「2. 需要操作的流程」中的操作邏輯生成導航代碼"""
+        code_lines = [
+            "        # 重要：根據 GameSetting.md「2. 需要操作的流程」中的操作邏輯動態生成",
+            "        # 只對有操作邏輯的流程進行智能導航",
+            "        if flow_state == 'SelectScene':  # 賽道選擇（如果有操作邏輯）",
+            "            # 根據該流程的操作邏輯: Left、Right",
+            "            if current_index < target_index:",
+            "                return 'RIGHT'",
+            "            elif current_index > target_index:",
+            "                return 'LEFT'",
+            "        elif flow_state == 'SelectBike':  # 車輛選擇（如果有操作邏輯）", 
+            "            # 根據該流程的操作邏輯: Up、Down",
+            "            if current_index < target_index:",
+            "                return 'DOWN'",
+            "            elif current_index > target_index:",
+            "                return 'UP'",
+            "        # 其他有操作邏輯的流程根據實際 GameSetting.md 內容動態添加"
+        ]
+        return '\n'.join(code_lines)
+    
+    def _generate_alternative_logic(self, game_config):
+        """根據 GameSetting.md「2. 需要操作的流程」中的操作邏輯生成替代輸入代碼"""
+        code_lines = [
+            "        # 重要：根據 GameSetting.md「2. 需要操作的流程」中的操作邏輯生成替代輸入",
+            "        # 當選項到底時的反向操作",
+            "        if flow_state == 'SelectScene':  # 賽道選擇（如果有操作邏輯）",
+            "            return 'LEFT'  # 根據操作邏輯 Left、Right，選項到底時往回",
+            "        elif flow_state == 'SelectBike':  # 車輛選擇（如果有操作邏輯）",
+            "            return 'UP'    # 根據操作邏輯 Up、Down，選項到底時往回",
+            "        # 其他有操作邏輯的流程根據實際 GameSetting.md 內容動態添加"
+        ]
+        return '\n'.join(code_lines)
+    
     def _analyze_proto_file(self, proto_path):
         """分析單個 proto 文件"""
         with open(proto_path, 'r', encoding='utf-8') as f:
@@ -406,7 +466,83 @@ except ImportError as e:
 - 支援 Ctrl+C 優雅退出，顯示 "程式已停止"
 - 使用 signal.signal(signal.SIGINT, signal_handler) 處理中斷
 
-4. **核心架構**：
+5. **智能選項選擇邏輯**（重要：僅針對 GameSetting.md「2. 需要操作的流程」中有操作邏輯的流程）：
+
+根據 GameSetting.md 的「2. 需要操作的流程」章節，只對有「操作邏輯」內容的流程實施智能選項選擇：
+- 有操作邏輯的流程：隨機選擇目標選項並智能導航
+- 無操作邏輯的流程：繼續使用隨機輸入
+
+```python
+class AutoTestAgent:
+    def __init__(self):
+        # ... 其他初始化
+        self.target_selections = {{}}  # 每個流程的目標選項
+        self.last_input_time = {{}}    # 每個流程的最後輸入時間
+        self.last_index = {{}}         # 每個流程的最後索引
+        self.target_reached = {{}}     # 是否已達到目標
+        
+    def initialize_targets(self):
+        # 根據 GameSetting.md 動態生成有操作邏輯的流程目標
+        flow_options = {{
+{self._generate_flow_options_code(game_config, game_config.get('states', []))}
+        }}
+        
+        for flow, options in flow_options.items():
+            if options:
+                target = random.choice(options)
+                self.target_selections[flow] = target
+                self.log(f"🎯 {{flow}} 流程目標: {{target}}")
+    
+    def handle_option_selection(self, game_data, flow_state, current_index, target_option):
+        current_time = time.time()
+        flow_key = str(flow_state)
+        
+        # 檢查是否已達到目標
+        if current_index == target_option:
+            if flow_key not in self.target_reached:
+                self.target_reached[flow_key] = current_time
+                self.log(f"🎯 已選中目標選項: {{target_option}}")
+                return None  # 不發送任何輸入
+            elif current_time - self.target_reached[flow_key] > 1.0:
+                # 目標達成超過1秒，確認穩定
+                return None
+        else:
+            # 重置目標達成狀態
+            if flow_key in self.target_reached:
+                del self.target_reached[flow_key]
+        
+        # 檢查是否需要輸入（避免過於頻繁）
+        if flow_key in self.last_input_time:
+            if current_time - self.last_input_time[flow_key] < 1.0:
+                # 1秒內已有輸入，檢查索引是否改變
+                if flow_key in self.last_index and self.last_index[flow_key] == current_index:
+                    # 索引未改變，可能到底了，嘗試另一個方向
+                    self.last_input_time[flow_key] = current_time
+                    self.last_index[flow_key] = current_index
+                    return self.get_alternative_input(flow_state)
+                else:
+                    # 索引有改變，等待
+                    return None
+        
+        # 記錄輸入時間和索引
+        self.last_input_time[flow_key] = current_time
+        self.last_index[flow_key] = current_index
+        
+        # 返回導航輸入
+        return self.get_navigation_input(flow_state, current_index, target_option)
+    
+    def get_navigation_input(self, flow_state, current_index, target_index):
+        # 根據 GameSetting.md 中的操作邏輯動態生成
+{self._generate_navigation_logic(game_config)}
+        return None
+    
+    def get_alternative_input(self, flow_state):
+        # 根據 GameSetting.md 中的操作邏輯動態生成替代輸入
+{self._generate_alternative_logic(game_config)}
+        return "LEFT"  # 預設值
+```
+
+6. **核心架構**：
 ```python
 class AutoTestAgent:
     def __init__(self):
@@ -502,12 +638,6 @@ class AutoTestAgent:
             agent_code = self.generate_agent_code(game_config, schema_info)
             
             if agent_code:
-                # 儲存 Q CLI 原始輸出
-                raw_output_path = self.project_root / "AutoTestAgent_AgentMaker_Raw.py"
-                with open(raw_output_path, 'w', encoding='utf-8') as f:
-                    f.write(agent_code)
-                self.log(f"📄 Q CLI 原始輸出已儲存: {raw_output_path}")
-                
                 # 先儲存程式碼，再檢查品質
                 output_path = self.project_root / "AutoTestAgent.py"
                 with open(output_path, 'w', encoding='utf-8') as f:
