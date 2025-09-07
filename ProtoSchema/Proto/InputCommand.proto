@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package sr4;
+
+// 輸入反饋
+enum EInputKeyType {
+    INPUT_KEY_UP = 0;
+    INPUT_KEY_DOWN = 1;
+    INPUT_KEY_LEFT = 2;
+    INPUT_KEY_RIGHT = 3;
+    INPUT_KEY_START = 4;
+    INPUT_KEY_COIN = 5;
+    INPUT_KEY_MAX = 6;
+}
+
+// 基本輸入指令
+message InputCommand {
+    repeated EInputKeyType key_inputs = 1;
+    bool is_key_down = 2;
+    int64 timestamp = 3;
+}

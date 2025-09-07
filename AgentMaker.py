@@ -250,21 +250,35 @@ class AgentMaker:
         with open(proto_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # 簡化分析，提取 enum 和 message
         info = {
             "enums": [],
-            "messages": []
+            "messages": [],
+            "input_keys": []  # 新增：提取輸入按鍵
         }
         
         lines = content.split('\n')
+        in_input_key_enum = False
+        
         for line in lines:
             line = line.strip()
+            
+            # 檢測枚舉定義
             if line.startswith('enum '):
                 enum_name = line.split()[1]
                 info["enums"].append(enum_name)
+                # 檢查是否是輸入按鍵枚舉
+                if 'InputKeyType' in enum_name:
+                    in_input_key_enum = True
             elif line.startswith('message '):
                 msg_name = line.split()[1]
                 info["messages"].append(msg_name)
+            elif line == '}':
+                in_input_key_enum = False
+            elif in_input_key_enum and '=' in line:
+                # 提取按鍵名稱
+                key_line = line.split('=')[0].strip()
+                if key_line.startswith('INPUT_KEY_'):
+                    info["input_keys"].append(key_line)
                 
         return info
     
@@ -337,6 +351,23 @@ class AgentMaker:
     
     def _build_generation_prompt(self, game_config, schema_info):
         """建立 Q CLI 生成提示"""
+        
+        # 提取實際的按鍵列表
+        input_keys = []
+        if 'InputCommand' in schema_info:
+            input_keys = schema_info['InputCommand'].get('input_keys', [])
+        
+        # 生成按鍵映射代碼
+        key_mapping_code = "self.key_mapping = {\n"
+        for key in input_keys[:8]:  # 限制前8個常用按鍵
+            key_name = key.replace('INPUT_KEY_', '')
+            key_mapping_code += f'            "{key_name}": EInputKeyType.{key},\n'
+        key_mapping_code += "        }"
+        
+        # 生成可用按鍵列表
+        available_keys = [key.replace('INPUT_KEY_', '') for key in input_keys[:5]]
+        available_keys_str = str(available_keys)
+        
         prompt = f"""只需要生成純Python程式碼，不要任何說明文字或格式化。
 
 生成 AutoTestAgent.py，專門為Windows環境設計，具備持續監聽功能：
@@ -353,7 +384,7 @@ sys.path.insert(0, script_dir)
 
 try:
     from ProtoSchema.GameFlowData_pb2 import GameFlowData
-    from ProtoSchema.InputCommand_pb2 import InputCommand
+    from ProtoSchema.InputCommand_pb2 import InputCommand, EInputKeyType
     print("✅ Protobuf 模組載入成功")
 except ImportError as e:
     print(f"❌ 無法導入 Protobuf 模組: {{e}}")
@@ -361,7 +392,13 @@ except ImportError as e:
     sys.exit(1)
 ```
 
-2. **持續監聽機制**（重要）：
+2. **動態按鍵映射**（重要）：
+```python
+# 按鍵映射 - 使用實際的 EInputKeyType 枚舉
+{key_mapping_code}
+```
+
+3. **持續監聽機制**（重要）：
 - 程式啟動後顯示 "🔄 等待遊戲連線..." 並持續嘗試連接
 - 連線失敗時每5秒重試一次，不退出程式
 - 連線成功後顯示 "✅ 遊戲連線成功，開始接收數據"
@@ -369,7 +406,7 @@ except ImportError as e:
 - 支援 Ctrl+C 優雅退出，顯示 "程式已停止"
 - 使用 signal.signal(signal.SIGINT, signal_handler) 處理中斷
 
-3. **核心架構**：
+4. **核心架構**：
 ```python
 class AutoTestAgent:
     def __init__(self):
@@ -414,17 +451,26 @@ class AutoTestAgent:
                 self.listen_loop()
 ```
 
-4. 必須包含完整的日誌系統：
+5. **隨機按鍵選擇**：
+使用可用按鍵列表: {available_keys_str}
+
+6. 必須包含完整的日誌系統：
 - 同時輸出到控制台和 AutoTestAgentLog.txt
 - 每個重要操作都要記錄
 - 包含時間戳記
 - 使用 flush() 確保即時寫入
+- **接收遊戲數據時必須記錄所有欄位**：
+  ```python
+  self.log(f"📥 接收遊戲數據:")
+  self.log(f"   所有欄位: {{game_data}}")
+  self.log(f"   狀態: {{game_data.current_flow_state}}")
+  ```
 
-5. 遊戲狀態：{game_config['states']}
-6. 按鍵定義：{game_config['keys']}
-7. UDP配置：{game_config['udp_config']}
+7. 遊戲狀態：{game_config['states']}
+8. 按鍵定義：{input_keys}
+9. UDP配置：{game_config['udp_config']}
 
-8. 必須包含：
+10. 必須包含：
 - 路徑修正（在最開頭）
 - 完整日誌系統（同時輸出到控制台和檔案）
 - UDP通訊 + 角色註冊 ("role:agent" → "ok:agent")

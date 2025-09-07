@@ -11,7 +11,7 @@ sys.path.insert(0, script_dir)
 
 try:
     from ProtoSchema.GameFlowData_pb2 import GameFlowData
-    from ProtoSchema.InputCommand_pb2 import InputCommand
+    from ProtoSchema.InputCommand_pb2 import InputCommand, EInputKeyType
     print("✅ Protobuf 模組載入成功")
 except ImportError as e:
     print(f"❌ 無法導入 Protobuf 模組: {e}")
@@ -34,19 +34,19 @@ class AutoTestAgent:
         self.connected = False
         self.log_file = "AutoTestAgentLog.txt"
 
-        # 遊戲狀態定義
-        self.game_states = ["Flow1", "Flow2", "Flow3", "Flow4", "Flow5", "Flow6"]
-
-        # 按鍵映射
+        # 按鍵映射 - 使用實際的 EInputKeyType 枚舉
         self.key_mapping = {
-            "Key1": 0,
-            "Key2": 1,
-            "Key3": 2,
-            "Key4": 3,
-            "Key5": 4,
-            "Key6": 5,
-            "Key7": 6
+            "UP": EInputKeyType.INPUT_KEY_UP,
+            "DOWN": EInputKeyType.INPUT_KEY_DOWN,
+            "LEFT": EInputKeyType.INPUT_KEY_LEFT,
+            "RIGHT": EInputKeyType.INPUT_KEY_RIGHT,
+            "START": EInputKeyType.INPUT_KEY_START,
+            "NITRO": EInputKeyType.INPUT_KEY_NITRO,
+            "TEST": EInputKeyType.INPUT_KEY_TEST,
+            "SERVICE": EInputKeyType.INPUT_KEY_SERVICE,
         }
+
+        self.available_keys = ["UP", "DOWN", "LEFT", "RIGHT", "START"]
 
         signal.signal(signal.SIGINT, self.signal_handler)
 
@@ -58,11 +58,8 @@ class AutoTestAgent:
     def log(self, message):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_message = f"[{timestamp}] {message}"
-
-        # 輸出到控制台
         print(log_message)
 
-        # 輸出到檔案
         try:
             with open(self.log_file, "a", encoding="utf-8") as f:
                 f.write(log_message + "\n")
@@ -76,26 +73,20 @@ class AutoTestAgent:
             self.socket.settimeout(5.0)
             return True
         except Exception as e:
-            self.log(f"Socket 創建失敗: {e}")
+            self.log(f"建立 Socket 失敗: {e}")
             return False
 
     def register_role(self):
         try:
-            # 發送角色註冊
-            self.socket.sendto("role:agent".encode('utf-8'), (self.host, self.port))
-
-            # 等待確認
-            data, addr = self.socket.recvfrom(1024)
-            message = data.decode('utf-8')
-
-            if message == "ok:agent":
-                self.log("角色註冊成功")
+            self.socket.sendto(b"role:agent", (self.host, self.port))
+            response, addr = self.socket.recvfrom(1024)
+            if response == b"ok:agent":
                 return True
             else:
-                self.log(f"角色註冊失敗: {message}")
+                self.log(f"角色註冊失敗，收到回應: {response}")
                 return False
         except Exception as e:
-            self.log(f"角色註冊異常: {e}")
+            self.log(f"角色註冊失敗: {e}")
             return False
 
     def connect_to_game(self):
@@ -110,43 +101,42 @@ class AutoTestAgent:
                 time.sleep(5)
         return False
 
-    def create_input_command(self, keys):
-        input_cmd = InputCommand()
-        for key in keys:
-            if key in self.key_mapping:
-                input_cmd.key_inputs.append(self.key_mapping[key])
-        input_cmd.is_key_down = True
-        input_cmd.timestamp = int(time.time() * 1000)
-        return input_cmd.SerializeToString()
-
     def process_game_data(self, data):
         try:
-            # 解析遊戲數據
             game_data = GameFlowData()
             game_data.ParseFromString(data)
 
-            self.log(f"📥 接收遊戲數據: 狀態={game_data.current_flow_state}")
+            self.log(f"📥 接收遊戲數據:")
+            self.log(f"   所有欄位: {game_data}")
+            self.log(f"   狀態: {game_data.current_flow_state}")
             self.log("=" * 50)
 
-            # 生成隨機輸入
-            random_key = random.choice(list(self.key_mapping.keys()))
-            input_command = self.create_input_command([random_key])
+            self.send_random_input()
 
-            # 發送輸入指令
-            self.socket.sendto(input_command, (self.host, self.port))
+        except Exception as e:
+            self.log(f"處理遊戲數據失敗: {e}")
+
+    def send_random_input(self):
+        try:
+            random_key = random.choice(self.available_keys)
+
+            input_command = InputCommand()
+            input_command.input_key = self.key_mapping[random_key]
+
+            serialized_data = input_command.SerializeToString()
+            self.socket.sendto(serialized_data, (self.host, self.port))
+
             self.log(f"📤 發送輸入指令: {random_key}")
             self.log("=" * 50)
 
         except Exception as e:
-            self.log(f"處理遊戲數據失敗: {e}")
+            self.log(f"發送輸入指令失敗: {e}")
 
     def listen_loop(self):
         while self.running and self.connected:
             try:
                 data, addr = self.socket.recvfrom(4096)
                 self.process_game_data(data)
-            except socket.timeout:
-                continue
             except Exception as e:
                 self.log(f"❌ 遊戲連線中斷: {e}")
                 self.connected = False
@@ -154,22 +144,16 @@ class AutoTestAgent:
 
     def run(self):
         self.running = True
-        self.log("AutoTestAgent 啟動")
-
         while self.running:
             if self.connect_to_game():
                 self.listen_loop()
-
-            if self.running:
-                self.log("❌ 遊戲連線中斷，5秒後重試...")
-                time.sleep(5)
 
 def main():
     try:
         agent = AutoTestAgent()
         agent.run()
     except KeyboardInterrupt:
-        print("\n程式已停止")
+        print("程式已停止")
     except Exception as e:
         print(f"程式執行錯誤: {e}")
         input("按 Enter 鍵結束...")
