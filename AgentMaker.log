@@ -15,8 +15,8 @@
 🤖 呼叫 Q CLI 生成程式碼...
 🪟 檢測到 Windows 環境，使用 WSL 執行 Q CLI...
 Q CLI 返回碼: 0
-Q CLI 輸出長度: 7769 字符
+Q CLI 輸出長度: 5378 字符
 ✅ Q CLI 執行成功
-📄 程式碼已儲存: E:\AutoTestAgent\AutoTestAgent.py (8115 bytes)
+📄 程式碼已儲存: E:\AutoTestAgent\AutoTestAgent.py (5698 bytes)
 ✅ 程式碼品質檢查通過
 ✅ AutoTestAgent 生成完成，品質檢查通過
